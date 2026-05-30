@@ -1,42 +1,62 @@
-# 💬 DevChat — Real-Time Developer Chat App 🚀
+# DevChat — Developer Chat Demo
 
-DevChat is a real-time chat platform built for developers to collaborate, ask questions, and share knowledge across topic-based rooms.
-It features instant messaging powered by Socket.io, secure JWT authentication, and a warm cream-themed UI designed for long coding sessions.
-Whether you're debugging Node.js, discussing React patterns, or just vibing in General Dev — DevChat brings developers together in one place.
+DevChat is a topic-based chat app built with React, Express, MongoDB, JWT auth, and Socket.io.
 
-## 🛠️ Stack
-- **Frontend**: React + Vite + Tailwind CSS + Socket.io-client ⚛️
-- **Backend**: Node.js + Express + MongoDB + Socket.io + JWT 🟢
+It is Vercel-ready:
 
-## ⚙️ Setup
+- Local development uses Socket.io for realtime chat.
+- Vercel demo deployments use serverless API routes plus automatic message polling, because Vercel serverless functions do not keep long-lived Socket.io connections alive.
+- If `MONGO_URI` is not set, the app uses a built-in memory store so the demo works without MongoDB Atlas.
 
-### 🖥️ Backend
+## Stack
+
+- Frontend: React, Vite, Tailwind CSS
+- Backend: Express, MongoDB, Mongoose, JWT
+- Realtime locally: Socket.io
+- Demo deployment: Vercel serverless API + memory store
+
+## Local Setup
+
+Backend:
+
+```bash
 cd server
 npm install
-# Edit .env with your MONGO_URI
+cp ../.env.example .env
 npm run dev
+```
 
-### 🌐 Frontend
+Frontend:
+
+```bash
 cd client
 npm install
 npm run dev
+```
 
-## 🔐 .env (server/)
-PORT=5000
-MONGO_URI=mongodb://localhost:27017/devchat
-JWT_SECRET=your_secret_key_here
-CLIENT_URL=http://localhost:5173
+## Vercel Deployment
 
-## ✨ Features
-- 🔑 JWT Auth (register/login)
-- 🏠 5 default topic rooms
-- ⚡ Real-time messaging via Socket.io
-- ⌨️ Typing indicators
-- 🟢 Online presence tracking
-- 🔒 Create private rooms with invite codes
-- 📜 Message history (last 50 per room)
-- 🎨 Cream/warm light theme UI
+Deploy the repository root to Vercel.
 
----
+For the simplest demo, add only these environment variables in Vercel:
 
-Created with ❤️ by Jayshree
+```env
+JWT_SECRET=replace-with-a-long-random-secret
+CLIENT_ORIGIN=https://your-vercel-app.vercel.app
+VITE_API_URL=/api
+```
+
+Leave `VITE_SOCKET_URL` empty on Vercel. The app will use polling so messages still work in the hosted demo.
+
+Do not add `MONGO_URI` if you want the no-database demo mode.
+
+## Build Check
+
+```bash
+npm run build --prefix client
+```
+
+## Notes
+
+- Demo mode data is temporary. It can reset when Vercel restarts the serverless function.
+- If you later want true hosted realtime chat, deploy the `server/` folder to a long-running Node host such as Render, Railway, or Fly.io, then set `VITE_SOCKET_URL` to that backend URL.

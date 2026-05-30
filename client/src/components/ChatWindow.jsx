@@ -7,53 +7,66 @@ import TypingIndicator from "./TypingIndicator.jsx";
 
 export default function ChatWindow({ currentRoom }) {
   const { user } = useAuth();
-  const { socket } = useSocket();
+  const { socket, socketEnabled } = useSocket();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [typingUsers, setTypingUsers] = useState([]);
   const messagesEnd = useRef(null);
   const typingTimeout = useRef(null);
 
-  // Load messages & join room
+  const loadMessages = async () => {
+    if (!currentRoom) return;
+    const res = await API.get(`/messages/${currentRoom._id}`);
+    setMessages(res.data);
+  };
+
   useEffect(() => {
-    if (!currentRoom || !socket) return;
+    if (!currentRoom) return;
+
     setMessages([]);
     setTypingUsers([]);
-    socket.emit("join-room", currentRoom._id);
-    API.get(`/messages/${currentRoom._id}`)
-      .then((res) => setMessages(res.data))
-      .catch(console.error);
-  }, [currentRoom, socket]);
+    loadMessages().catch(console.error);
 
-  // Listen for new messages
+    if (socketEnabled && socket) {
+      socket.emit("join-room", currentRoom._id);
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      loadMessages().catch(console.error);
+    }, 2500);
+    return () => window.clearInterval(intervalId);
+  }, [currentRoom, socket, socketEnabled]);
+
   useEffect(() => {
-    if (!socket) return;
+    if (!socketEnabled || !socket) return;
     const handler = (msg) => setMessages((prev) => [...prev, msg]);
     socket.on("new-message", handler);
     return () => socket.off("new-message", handler);
-  }, [socket]);
+  }, [socket, socketEnabled]);
 
-  // Typing indicators
   useEffect(() => {
-    if (!socket) return;
+    if (!socketEnabled || !socket) return;
     const onTyping = (data) => {
       setTypingUsers((prev) => prev.includes(data.username) ? prev : [...prev, data.username]);
     };
     const onStopTyping = (data) => {
-      setTypingUsers((prev) => prev.filter((u) => u !== data.username));
+      setTypingUsers((prev) => prev.filter((username) => username !== data.username));
     };
     socket.on("user-typing", onTyping);
     socket.on("user-stop-typing", onStopTyping);
-    return () => { socket.off("user-typing", onTyping); socket.off("user-stop-typing", onStopTyping); };
-  }, [socket]);
+    return () => {
+      socket.off("user-typing", onTyping);
+      socket.off("user-stop-typing", onStopTyping);
+    };
+  }, [socket, socketEnabled]);
 
-  // Auto-scroll
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingUsers]);
 
   const handleTyping = () => {
-    if (!socket || !currentRoom) return;
+    if (!socketEnabled || !socket || !currentRoom) return;
     socket.emit("typing", { roomId: currentRoom._id, username: user.username });
     clearTimeout(typingTimeout.current);
     typingTimeout.current = setTimeout(() => {
@@ -61,12 +74,25 @@ export default function ChatWindow({ currentRoom }) {
     }, 1500);
   };
 
-  const sendMessage = (e) => {
+  const sendMessage = async (e) => {
     e.preventDefault();
-    if (!input.trim() || !socket || !currentRoom) return;
-    socket.emit("send-message", { content: input.trim(), senderId: user._id, roomId: currentRoom._id });
-    socket.emit("stop-typing", { roomId: currentRoom._id, username: user.username });
+    const content = input.trim();
+    if (!content || !currentRoom) return;
+
     setInput("");
+    if (socketEnabled && socket) {
+      socket.emit("send-message", { content, senderId: user._id, roomId: currentRoom._id });
+      socket.emit("stop-typing", { roomId: currentRoom._id, username: user.username });
+      return;
+    }
+
+    try {
+      const res = await API.post(`/messages/${currentRoom._id}`, { content });
+      setMessages((prev) => [...prev, res.data]);
+    } catch (error) {
+      setInput(content);
+      console.error(error);
+    }
   };
 
   if (!currentRoom) {
@@ -98,8 +124,15 @@ export default function ChatWindow({ currentRoom }) {
         <div ref={messagesEnd} />
       </div>
       <form className="chat-input-area" onSubmit={sendMessage}>
-        <input className="input-cream chat-input" placeholder="Type a message..."
-          value={input} onChange={(e) => { setInput(e.target.value); handleTyping(); }} />
+        <input
+          className="input-cream chat-input"
+          placeholder="Type a message..."
+          value={input}
+          onChange={(e) => {
+            setInput(e.target.value);
+            handleTyping();
+          }}
+        />
         <button className="btn-send" type="submit" disabled={!input.trim()}>Send</button>
       </form>
     </main>

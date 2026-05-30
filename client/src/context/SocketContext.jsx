@@ -4,26 +4,47 @@ import { useAuth } from "./AuthContext.jsx";
 
 const SocketContext = createContext(null);
 
+const getSocketUrl = () => {
+  if (import.meta.env.VITE_SOCKET_URL) return import.meta.env.VITE_SOCKET_URL;
+  return import.meta.env.DEV ? window.location.origin : "";
+};
+
 export const SocketProvider = ({ children }) => {
   const { user } = useAuth();
   const [socket, setSocket] = useState(null);
+  const [socketEnabled, setSocketEnabled] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-    const s = io(window.location.origin, {
+    if (!user) {
+      setSocket(null);
+      setSocketEnabled(false);
+      return;
+    }
+
+    const socketUrl = getSocketUrl();
+    if (!socketUrl) {
+      setSocket(null);
+      setSocketEnabled(false);
+      return;
+    }
+
+    const nextSocket = io(socketUrl, {
       transports: ["websocket"],
     });
-    s.on("connect", () => {
-      console.log("Socket connected:", s.id);
-      s.emit("user-online", user);
+
+    nextSocket.on("connect", () => {
+      setSocketEnabled(true);
+      nextSocket.emit("user-online", user);
     });
-    s.on("disconnect", () => console.log("Socket disconnected"));
-    setSocket(s);
-    return () => s.disconnect();
+    nextSocket.on("disconnect", () => setSocketEnabled(false));
+    nextSocket.on("connect_error", () => setSocketEnabled(false));
+
+    setSocket(nextSocket);
+    return () => nextSocket.disconnect();
   }, [user]);
 
   return (
-    <SocketContext.Provider value={{ socket }}>
+    <SocketContext.Provider value={{ socket, socketEnabled }}>
       {children}
     </SocketContext.Provider>
   );

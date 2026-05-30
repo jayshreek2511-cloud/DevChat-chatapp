@@ -44,7 +44,6 @@ const roomSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-// Generate invite code for private rooms
 roomSchema.pre("save", function (next) {
   if (this.isPrivate && !this.inviteCode) {
     this.inviteCode = uuidv4().split("-")[0].toUpperCase();

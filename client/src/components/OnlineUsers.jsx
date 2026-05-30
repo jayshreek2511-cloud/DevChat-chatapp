@@ -2,16 +2,22 @@ import { useState, useEffect } from "react";
 import { useSocket } from "../context/SocketContext.jsx";
 
 export default function OnlineUsers({ currentRoom }) {
-  const { socket } = useSocket();
+  const { socket, socketEnabled } = useSocket();
   const [users, setUsers] = useState([]);
 
   useEffect(() => {
-    if (!socket) return;
+    if (!socketEnabled || !socket) {
+      setUsers([]);
+      return;
+    }
     const handler = (list) => setUsers(list);
     socket.on("room-users", handler);
     socket.on("online-users", handler);
-    return () => { socket.off("room-users", handler); socket.off("online-users", handler); };
-  }, [socket]);
+    return () => {
+      socket.off("room-users", handler);
+      socket.off("online-users", handler);
+    };
+  }, [socket, socketEnabled]);
 
   return (
     <aside className="online-panel">
@@ -31,7 +37,7 @@ export default function OnlineUsers({ currentRoom }) {
         ))}
         {users.length === 0 && (
           <div className="empty-hint">
-            {currentRoom ? "No users in this room" : "Select a room"}
+            {!socketEnabled && currentRoom ? "Demo mode: messages refresh automatically" : currentRoom ? "No users in this room" : "Select a room"}
           </div>
         )}
       </div>
